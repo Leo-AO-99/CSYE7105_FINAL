@@ -38,7 +38,7 @@ class TimestepMLP(nn.Module):
     def __init__(self, in_channels: int, time_emb_dim: int):
         super().__init__()
         self.linear1 = nn.Linear(in_channels, time_emb_dim)
-        self.silu = nn.SiLu()
+        self.silu = nn.SiLU()
         time_emb_dim_out = time_emb_dim
         self.linear2 = nn.Linear(time_emb_dim, time_emb_dim_out)
     
@@ -75,7 +75,7 @@ class DownSample(nn.Module):
             raise ValueError("downsampling tensor height or width should be even", x.shape)
 
         out = self.downsample(x)
-        debug(f"DownSample: {x.shape} -> {out.shape}")
+        # debug(f"DownSample: {x.shape} -> {out.shape}")
         return out
     
 class Upsample(nn.Module):
@@ -103,7 +103,7 @@ class Upsample(nn.Module):
     
     def forward(self, x, time_emb, y):
         out = self.upsample(x)
-        debug(f"Upsample: {x.shape} -> {out.shape}")
+        # debug(f"Upsample: {x.shape} -> {out.shape}")
         return out
 
 class SelfAttention(nn.Module):
@@ -117,7 +117,7 @@ class SelfAttention(nn.Module):
         self.to_out = nn.Conv2d(in_channels, in_channels, 1)
     
     def forward(self, x):
-        debug(f"SelfAttention, x.shape: {x.shape}")
+        # debug(f"SelfAttention, x.shape: {x.shape}")
         b, c, h, w = x.shape
         q, k, v = torch.split(self.to_qkv(self.group_norm(x)), self.in_channels, dim=1)
 
@@ -125,7 +125,7 @@ class SelfAttention(nn.Module):
         k = k.view(b, c, h * w)
         v = v.permute(0, 2, 3, 1).view(b, h * w, c)
         
-        debug(f"SelfAttention, q.shape: {q.shape}, k.shape: {k.shape}, v.shape: {v.shape}")
+        # debug(f"SelfAttention, q.shape: {q.shape}, k.shape: {k.shape}, v.shape: {v.shape}")
 
         dot_products = torch.bmm(q, k) * (c ** (-0.5))
         assert dot_products.shape == (b, h * w, h * w)
@@ -148,7 +148,7 @@ class ResBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, dropout: float, num_groups: int, use_attention: bool):
         super().__init__()
         
-        self.relu = nn.ReLu()
+        self.relu = nn.ReLU()
         
         self.norm1 = nn.GroupNorm(num_groups, in_channels)
         self.conv1 = nn.Conv2d(in_channels, out_channels, 3, padding=1)
@@ -175,7 +175,7 @@ class ResBlock(nn.Module):
         out = self.conv2(out) + self.res(x)
         
         out = self.attention(out)
-        debug(f"ResBlock: {org_shape} -> {out.shape}")
+        # debug(f"ResBlock: {org_shape} -> {out.shape}")
         return out
     
 
@@ -217,18 +217,18 @@ class ResNet(nn.Module):
                     num_groups=resblock_n_groups,
                     use_attention=layer_config.use_attention,
                 ))
-                debug(f"ResNet(), init {layer_idx} {block_idx} resblock, channels: {now_channels} -> {out_channels}, attention: {layer_config.use_attention}")
+                # debug(f"ResNet(), init {layer_idx} {block_idx} resblock, channels: {now_channels} -> {out_channels}, attention: {layer_config.use_attention}")
                 now_channels = out_channels
                 channels.append(now_channels)
 
             if layer_idx < layer_length - 1:
-                debug(f"ResNet(), init {layer_idx} downsample after {num_res_blocks} resblocks, in_channels: {now_channels}")
+                # debug(f"ResNet(), init {layer_idx} downsample after {num_res_blocks} resblocks, in_channels: {now_channels}")
                 self.down_layers.append(DownSample(now_channels))
                 channels.append(now_channels)
         
         
         # TODO 在中间加入transformer
-        debug(f"ResNet(), init 2 mid layers")
+        # debug(f"ResNet(), init 2 mid layers")
         self.mid_layers.extend([
             ResBlock(now_channels, now_channels, resblock_dropout, resblock_n_groups, True),
             ResBlock(now_channels, now_channels, resblock_dropout, resblock_n_groups, False),
@@ -249,11 +249,11 @@ class ResNet(nn.Module):
                     num_groups=resblock_n_groups,
                     use_attention=layer_config.use_attention,
                 ))
-                debug(f"ResNet(), init {layer_idx} {block_idx} resblock, channels: {in_channels} -> {out_channels}, attention: {layer_config.use_attention}")
+                # debug(f"ResNet(), init {layer_idx} {block_idx} resblock, channels: {in_channels} -> {out_channels}, attention: {layer_config.use_attention}")
                 now_channels = out_channels
             
             if layer_idx > 0:
-                debug(f"ResNet(), init {layer_idx} upsample after {num_res_blocks + 1} resblocks, in_channels: {now_channels}")
+                # debug(f"ResNet(), init {layer_idx} upsample after {num_res_blocks + 1} resblocks, in_channels: {now_channels}")
                 self.up_layers.append(Upsample(now_channels))
 
         
@@ -271,37 +271,39 @@ class ResNet(nn.Module):
         returns: [batch_size, channels, height, width]
         '''
         
-        debug(f"ResNet(), x.shape: {x.shape}")
+        # debug(f"ResNet(), x.shape: {x.shape}")
+
+        x = x.to(dtype=torch.float32) # UPDATE/////
         
         time_emb = self.pos_embedding(time)
         time_emb = self.time_mlp(time_emb)
         
         x = self.init_conv(x)
         
-        debug(f"ResNet(), after init_conv: {x.shape}")
+        # debug(f"ResNet(), after init_conv: {x.shape}")
         
         skips = [x]
         for layer_idx, layer in enumerate(self.down_layers):
             org_shape = x.shape
             x = layer(x, time_emb, y)
-            debug(f"ResNet(), down_layers-{layer_idx}, {org_shape} -> {x.shape}")
+            # debug(f"ResNet(), down_layers-{layer_idx}, {org_shape} -> {x.shape}")
             skips.append(x)
         
         for layer_idx, layer in enumerate(self.mid_layers):
             org_shape = x.shape
             x = layer(x, time_emb, y)
-            debug(f"ResNet(), mid_layers-{layer_idx}, {org_shape} -> {x.shape}")
+            # debug(f"ResNet(), mid_layers-{layer_idx}, {org_shape} -> {x.shape}")
         
         for layer_idx, layer in enumerate(self.up_layers):
             if isinstance(layer, ResBlock):
                 x = torch.cat([x, skips.pop()], dim=1)
             org_shape = x.shape
             x = layer(x, time_emb, y)
-            debug(f"ResNet(), up_layers-{layer_idx}, {org_shape} -> {x.shape}")
+            # debug(f"ResNet(), up_layers-{layer_idx}, {org_shape} -> {x.shape}")
 
         x = self.relu(self.out_norm(x))
         x = self.out_conv(x)
         
-        debug(f"ResNet(), after final conv: {x.shape}")
+        # debug(f"ResNet(), after final conv: {x.shape}")
         
         return x
