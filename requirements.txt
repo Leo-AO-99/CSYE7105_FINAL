@@ -1,0 +1,7 @@
+torch 
+torchvision
+torchaudio
+tqdm
+numpy
+matplotlib
+pydantic<2.0

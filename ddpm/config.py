@@ -12,8 +12,9 @@ class LayerConfig(BaseModel):
     use_attention: bool = Field(description="Whether to use attention ...")
 
 class ResNetConfig(BaseModel):
-    time_emb_scale = 1.0
-    time_emb_dim = 128 * 1 # mat2 shape
+    initial_pad: int = Field(default=2, description="Padding for the initial conv")
+    time_emb_scale: float = Field(default=1.0, description="Scale for the time embedding")
+    time_emb_dim: int = Field(default=128 * 4, description="Dimension of the time embedding")
     # 128 * 2 => 64*128 and 256*256
     # 124 * 4 => 64*128 and 512*512
     base_channels: int = Field(default=128, description="output channel of the first conv layer")
