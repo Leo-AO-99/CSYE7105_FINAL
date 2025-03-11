@@ -14,7 +14,7 @@ class LayerConfig(BaseModel):
 class ResNetConfig(BaseModel):
     initial_pad: int = Field(default=2, description="Padding for the initial conv")
     time_emb_scale: float = Field(default=1.0, description="Scale for the time embedding")
-    time_emb_dim: int = Field(default=128 * 4, description="Dimension of the time embedding")
+    time_emb_dim: int = Field(default=128 * 1, description="Dimension of the time embedding")
     # 128 * 2 => 64*128 and 256*256
     # 124 * 4 => 64*128 and 512*512
     base_channels: int = Field(default=128, description="output channel of the first conv layer")
@@ -25,7 +25,7 @@ class ResNetConfig(BaseModel):
         LayerConfig(channel_mult=1, use_attention=False),
         LayerConfig(channel_mult=2, use_attention=False),
         LayerConfig(channel_mult=4, use_attention=True),
-        # LayerConfig(channel_mult=8, use_attention=True)
+        LayerConfig(channel_mult=8, use_attention=True)
     ])
 
     dropout: float = Field(default=0.1, description="Dropout rate")
@@ -37,8 +37,10 @@ class DDPMConfig(BaseModel):
     num_timesteps: int = 1000  # e.g. default T=1000
     loss_type: str = "l2"
 
-    img_channels: int = 3
-    batch_size: int = 64
+    img_channels: int = Field(default=3, description="Number of channels in the image")
+    batch_size: int = Field(default=64, description="Batch size")
+    
+    num_classes: int = Field(default=10, description="Number of classes")
 
     res_net_config: ResNetConfig = Field(
         default=ResNetConfig(), 
