@@ -38,7 +38,7 @@ class DDPMConfig(BaseModel):
     loss_type: str = "l2"
 
     img_channels: int = Field(default=3, description="Number of channels in the image")
-    batch_size: int = Field(default=64, description="Batch size")
+    batch_size: int = Field(default=256, description="Batch size")
     
     num_classes: int = Field(default=10, description="Number of classes")
 
