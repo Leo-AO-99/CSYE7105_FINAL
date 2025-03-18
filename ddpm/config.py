@@ -15,8 +15,6 @@ class ResNetConfig(BaseModel):
     initial_pad: int = Field(default=2, description="Padding for the initial conv")
     time_emb_scale: float = Field(default=1.0, description="Scale for the time embedding")
     time_emb_dim: int = Field(default=128 * 1, description="Dimension of the time embedding")
-    # 128 * 2 => 64*128 and 256*256
-    # 124 * 4 => 64*128 and 512*512
     base_channels: int = Field(default=128, description="output channel of the first conv layer")
     num_res_blocks: int = Field(default=2, description="Number of residual blocks at each resolution level")
 
@@ -24,8 +22,8 @@ class ResNetConfig(BaseModel):
     layers_config: List[LayerConfig] = Field(default=[
         LayerConfig(channel_mult=1, use_attention=False),
         LayerConfig(channel_mult=2, use_attention=False),
-        LayerConfig(channel_mult=4, use_attention=True),
-        LayerConfig(channel_mult=8, use_attention=True)
+        # LayerConfig(channel_mult=4, use_attention=True),
+        # LayerConfig(channel_mult=8, use_attention=True)
     ])
 
     dropout: float = Field(default=0.1, description="Dropout rate")
@@ -38,7 +36,9 @@ class DDPMConfig(BaseModel):
     loss_type: str = "l2"
 
     img_channels: int = Field(default=3, description="Number of channels in the image")
-    batch_size: int = Field(default=64, description="Batch size")
+    
+    batch_size: int = Field(default=64, description="Batch size") # 3060 laptop 2.8GB vram 4:30/epoch
+    # batch_size: int = Field(default=256, description="Batch size") # 4090 desktop 23GB vram 1:45/epoch
     
     num_classes: int = Field(default=10, description="Number of classes")
 
