@@ -99,8 +99,12 @@ def train(rank, world_size):
         end_time = time.time()
         print(f"Rank {rank} Epoch {epoch} took {end_time - start_time:.3f} seconds, ls: {loss.item()}")
         
-        if rank == 0 and ( + 1) % 25 == 0:
-            torch.save(model.module.state_dict(), f"{cpt_prefix}_cpt/epoch_{epoch}.pth")
+        if rank == 0 and (epoch + 1) % 25 == 0:
+            save_dict = {
+                "model": model.module.state_dict(),
+                "config": cifar10_config,
+            }
+            torch.save(save_dict, f"{cpt_prefix}_cpt/epoch_{epoch}.pth")
 
     dist.destroy_process_group()
 
