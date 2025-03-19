@@ -33,12 +33,18 @@ learning_rate = 1e-4
 # Utility function to update EMA weights
 def update_ema(model, ema_model, alpha=0.9999):
     """EMA update for each parameter."""
+    if isinstance(model, nn.parallel.DistributedDataParallel):
+            model = model.module
+    if isinstance(ema_model, nn.parallel.DistributedDataParallel):
+        ema_model = ema_model.module
     with torch.no_grad():
         for p, p_ema in zip(model.parameters(), ema_model.parameters()):
             p_ema.data = alpha * p_ema.data + (1 - alpha) * p.data
 
 def train(rank, world_size):
-    dist.init_process_group(backend='nccl', world_size=world_size, rank=rank, init_method="tcp://10.1.1.20:23456")
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '23456'
+    dist.init_process_group(backend='nccl', world_size=world_size, rank=rank)
     torch.cuda.set_device(rank)
     
     train_dataset, test_dataset = get_cifar10_datasets()
