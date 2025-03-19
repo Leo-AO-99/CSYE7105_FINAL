@@ -7,11 +7,31 @@ def debug(msg):
     if DEBUG:
         print(msg)
 
-class LayerConfig(BaseModel):
+class BaseConfig:
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if '__pydantic_fields_set__' not in state:
+            state['__pydantic_fields_set__'] = set(self.__dict__.keys())
+        if '__pydantic_extra__' not in state:
+            state['__pydantic_extra__'] = {}
+        if '__pydantic_private__' not in state:
+            state['__pydantic_private__'] = None
+        return state
+    
+    def __setstate__(self, state):
+        if '__pydantic_fields_set__' not in state:
+            state['__pydantic_fields_set__'] = set()
+        if '__pydantic_extra__' not in state:
+            state['__pydantic_extra__'] = {}
+        if '__pydantic_private__' not in state:
+            state['__pydantic_private__'] = None
+        self.__dict__.update(state)
+
+class LayerConfig(BaseModel, BaseConfig):
     channel_mult: int = Field(description="Multiplier for the number of channels ...")
     use_attention: bool = Field(description="Whether to use attention ...")
 
-class ResNetConfig(BaseModel):
+class ResNetConfig(BaseModel, BaseConfig):
     initial_pad: int = Field(default=0, description="Padding for the initial conv")
     time_emb_scale: float = Field(default=1.0, description="Scale for the time embedding")
     time_emb_dim: int = Field(default=128 * 1, description="Dimension of the time embedding")
@@ -29,7 +49,7 @@ class ResNetConfig(BaseModel):
     dropout: float = Field(default=0.1, description="Dropout rate")
     num_groups: int = Field(default=32, description="Number of groups for group normalization")
 
-class DDPMConfig(BaseModel):
+class DDPMConfig(BaseModel, BaseConfig):
     # Typically we use a list of betas, but you can also store them after creation.
     betas: Optional[List[float]] = Field(default=None, description="Diffusion beta schedule")
     num_timesteps: int = 1000  # e.g. default T=1000
