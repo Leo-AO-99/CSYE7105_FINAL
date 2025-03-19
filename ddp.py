@@ -11,7 +11,7 @@ import time
 import matplotlib.pyplot as plt
 
 from ddpm import config as _config
-from ddpm.config import cifar10_config
+from ddpm.config import LayerConfig, cifar10_config
 from ddpm.data import get_cifar10_datasets
 from ddpm.diffusion_model import DiffusionModel
 
@@ -19,10 +19,18 @@ _config.DEBUG = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 cifar10_config.res_net_config.initial_pad = 0
-batch_size = cifar10_config.batch_size
+cifar10_config.batch_size = 128
+cifar10_config.res_net_config.layers_config = [
+    LayerConfig(channel_mult=1, use_attention=False),
+    LayerConfig(channel_mult=2, use_attention=False),
+    LayerConfig(channel_mult=4, use_attention=True),
+    LayerConfig(channel_mult=8, use_attention=True)
+]
 
 # max_epochs = 500
-max_epochs = 8
+max_epochs = 1000
+batch_size = cifar10_config.batch_size
+
 
 each_epochs = max_epochs // torch.cuda.device_count()
 
@@ -34,7 +42,7 @@ learning_rate = 1e-4
 def update_ema(model, ema_model, alpha=0.9999):
     """EMA update for each parameter."""
     if isinstance(model, nn.parallel.DistributedDataParallel):
-            model = model.module
+        model = model.module
     if isinstance(ema_model, nn.parallel.DistributedDataParallel):
         ema_model = ema_model.module
     with torch.no_grad():
@@ -42,13 +50,18 @@ def update_ema(model, ema_model, alpha=0.9999):
             p_ema.data = alpha * p_ema.data + (1 - alpha) * p.data
 
 def train(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '23456'
-    dist.init_process_group(backend='nccl', world_size=world_size, rank=rank)
+    if rank == 0:
+        cpt_prefix = f"{int(time.time())}"
+        if not os.path.exists(os.path.join(cpt_prefix, "_cpt")):
+            os.makedirs(os.path.join(cpt_prefix, "_cpt"))
+
+    addr = "localhost"
+    port = 78960
+    dist.init_process_group(backend='nccl', world_size=world_size, rank=rank, init_method=f"tcp://{addr}:{port}")
     torch.cuda.set_device(rank)
-    
+
     train_dataset, test_dataset = get_cifar10_datasets()
-    
+
     model = DiffusionModel(cifar10_config).to(rank)
     model_ema = DiffusionModel(cifar10_config).to(rank)
     model_ema.load_state_dict(model.state_dict())
@@ -84,7 +97,10 @@ def train(rank, world_size):
         
         model_ema.eval()
         end_time = time.time()
-        print(f"Rank {rank} Epoch {epoch} took {end_time - start_time:.3f} seconds")
+        print(f"Rank {rank} Epoch {epoch} took {end_time - start_time:.3f} seconds, ls: {loss.item()}")
+        
+        if rank == 0 and epoch % 25 == 0:
+            torch.save(model.module.state_dict(), f"{cpt_prefix}_cpt/epoch_{epoch}.pth")
 
     dist.destroy_process_group()
 
@@ -94,4 +110,4 @@ if __name__ == "__main__":
     world_size = torch.cuda.device_count()
     mp.spawn(train, args=(world_size,), nprocs=world_size)
     
-    time.time() - ss_time()
+    print(f"Total time: {time.time() - ss_time:.3f} seconds")
