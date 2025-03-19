@@ -52,11 +52,11 @@ def update_ema(model, ema_model, alpha=0.9999):
 def train(rank, world_size):
     if rank == 0:
         cpt_prefix = f"{int(time.time())}"
-        if not os.path.exists(os.path.join(cpt_prefix, "_cpt")):
-            os.makedirs(os.path.join(cpt_prefix, "_cpt"))
+        if not os.path.exists(f"{cpt_prefix}_cpt"):
+            os.makedirs(f"{cpt_prefix}_cpt")
 
     addr = "localhost"
-    port = 78960
+    port = 47239
     dist.init_process_group(backend='nccl', world_size=world_size, rank=rank, init_method=f"tcp://{addr}:{port}")
     torch.cuda.set_device(rank)
 
@@ -99,7 +99,7 @@ def train(rank, world_size):
         end_time = time.time()
         print(f"Rank {rank} Epoch {epoch} took {end_time - start_time:.3f} seconds, ls: {loss.item()}")
         
-        if rank == 0 and epoch % 25 == 0:
+        if rank == 0 and ( + 1) % 25 == 0:
             torch.save(model.module.state_dict(), f"{cpt_prefix}_cpt/epoch_{epoch}.pth")
 
     dist.destroy_process_group()
