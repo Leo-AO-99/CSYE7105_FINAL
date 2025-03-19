@@ -83,7 +83,7 @@ def train(rank, world_size, args):
 
 
     sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
-    dataloader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler)
+    dataloader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler, num_workers=4, pin_memory=True)
     
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
