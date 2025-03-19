@@ -9,23 +9,23 @@ from tqdm import tqdm
 import sys
 import time
 import matplotlib.pyplot as plt
+import argparse
 
 from ddpm import config as _config
 from ddpm.config import LayerConfig, cifar10_config
 from ddpm.data import get_cifar10_datasets
 from ddpm.diffusion_model import DiffusionModel
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train DDPM with DDP')
+    parser.add_argument('--max_epochs', type=int, default=None, help='Maximum number of epochs')
+    parser.add_argument('--batch_size', type=int, default=None, help='Batch size per GPU')
+    parser.add_argument('--load_cpt', type=str, default=None, 
+                        help='load checkpoint path')
+    return parser.parse_args()
+
 _config.DEBUG = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-cifar10_config.res_net_config.initial_pad = 0
-cifar10_config.batch_size = 128
-cifar10_config.res_net_config.layers_config = [
-    LayerConfig(channel_mult=1, use_attention=False),
-    LayerConfig(channel_mult=2, use_attention=False),
-    LayerConfig(channel_mult=4, use_attention=True),
-    LayerConfig(channel_mult=8, use_attention=True)
-]
 
 # max_epochs = 500
 max_epochs = 1000
@@ -49,7 +49,7 @@ def update_ema(model, ema_model, alpha=0.9999):
         for p, p_ema in zip(model.parameters(), ema_model.parameters()):
             p_ema.data = alpha * p_ema.data + (1 - alpha) * p.data
 
-def train(rank, world_size):
+def train(rank, world_size, args):
     if rank == 0:
         cpt_prefix = f"{int(time.time())}"
         if not os.path.exists(f"{cpt_prefix}_cpt"):
@@ -61,11 +61,22 @@ def train(rank, world_size):
     torch.cuda.set_device(rank)
 
     train_dataset, test_dataset = get_cifar10_datasets()
+    
+    if args.load_cpt is not None:
+        checkpoint = torch.load(args.load_cpt, map_location=f'cuda:{rank}')
+        model = DiffusionModel(checkpoint['config']).to(rank)
+        model.load_state_dict(checkpoint['model'])
+        
+        model_ema = DiffusionModel(checkpoint['config']).to(rank)
+        model_ema.load_state_dict(checkpoint['model'])  # 用相同的权重初始化EMA模型
+        model_ema.eval()
+    else:
+        model = DiffusionModel(cifar10_config).to(rank)
+        model_ema = DiffusionModel(cifar10_config).to(rank)
+        model_ema.load_state_dict(model.state_dict())
+        model_ema.eval()
 
-    model = DiffusionModel(cifar10_config).to(rank)
-    model_ema = DiffusionModel(cifar10_config).to(rank)
-    model_ema.load_state_dict(model.state_dict())
-    model_ema.eval()
+    
 
     model = nn.parallel.DistributedDataParallel(model, device_ids=[rank])
     model_ema = nn.parallel.DistributedDataParallel(model_ema, device_ids=[rank])
@@ -108,9 +119,17 @@ def train(rank, world_size):
     dist.destroy_process_group()
 
 if __name__ == "__main__":
+    args = parse_args()
+    
+    if args.max_epochs is not None:
+        max_epochs = args.max_epochs
+        each_epochs = max_epochs // torch.cuda.device_count()
+    if args.batch_size is not None:
+        batch_size = args.batch_size
+    
     ss_time = time.time()
     
     world_size = torch.cuda.device_count()
-    mp.spawn(train, args=(world_size,), nprocs=world_size)
+    mp.spawn(train, args=(world_size, args,), nprocs=world_size)
     
     print(f"Total time: {time.time() - ss_time:.3f} seconds")

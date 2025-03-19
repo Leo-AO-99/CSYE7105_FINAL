@@ -12,7 +12,7 @@ class LayerConfig(BaseModel):
     use_attention: bool = Field(description="Whether to use attention ...")
 
 class ResNetConfig(BaseModel):
-    initial_pad: int = Field(default=2, description="Padding for the initial conv")
+    initial_pad: int = Field(default=0, description="Padding for the initial conv")
     time_emb_scale: float = Field(default=1.0, description="Scale for the time embedding")
     time_emb_dim: int = Field(default=128 * 1, description="Dimension of the time embedding")
     base_channels: int = Field(default=128, description="output channel of the first conv layer")
@@ -22,8 +22,8 @@ class ResNetConfig(BaseModel):
     layers_config: List[LayerConfig] = Field(default=[
         LayerConfig(channel_mult=1, use_attention=False),
         LayerConfig(channel_mult=2, use_attention=False),
-        # LayerConfig(channel_mult=4, use_attention=True),
-        # LayerConfig(channel_mult=8, use_attention=True)
+        LayerConfig(channel_mult=4, use_attention=True),
+        LayerConfig(channel_mult=8, use_attention=True)
     ])
 
     dropout: float = Field(default=0.1, description="Dropout rate")
