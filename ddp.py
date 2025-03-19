@@ -50,12 +50,11 @@ def train(rank, world_size):
     train_dataset, test_dataset = get_cifar10_datasets()
     
     model = DiffusionModel(cifar10_config).to(rank)
-    model = nn.parallel.DistributedDataParallel(model, device_ids=[rank])
-
-# Create an EMA model (exact copy of the original model)
     model_ema = DiffusionModel(cifar10_config).to(rank)
     model_ema.load_state_dict(model.state_dict())
     model_ema.eval()
+
+    model = nn.parallel.DistributedDataParallel(model, device_ids=[rank])
     model_ema = nn.parallel.DistributedDataParallel(model_ema, device_ids=[rank])
 
 
