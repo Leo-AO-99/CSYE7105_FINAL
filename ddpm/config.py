@@ -1,6 +1,6 @@
 # config.py
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Any
 
 DEBUG = True
 def debug(msg):
@@ -8,24 +8,17 @@ def debug(msg):
         print(msg)
 
 class BaseConfig:
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        if '__pydantic_fields_set__' not in state:
-            state['__pydantic_fields_set__'] = set(self.__dict__.keys())
-        if '__pydantic_extra__' not in state:
-            state['__pydantic_extra__'] = {}
-        if '__pydantic_private__' not in state:
-            state['__pydantic_private__'] = None
-        return state
-    
-    def __setstate__(self, state):
-        if '__pydantic_fields_set__' not in state:
-            state['__pydantic_fields_set__'] = set()
-        if '__pydantic_extra__' not in state:
-            state['__pydantic_extra__'] = {}
-        if '__pydantic_private__' not in state:
-            state['__pydantic_private__'] = None
-        self.__dict__.update(state)
+    def __setstate__(self, state: dict[Any, Any]) -> None:
+        """
+        Hack to allow unpickling models stored from pydantic V1
+        """
+        state.setdefault("__pydantic_extra__", {})
+        state.setdefault("__pydantic_private__", {})
+
+        if "__pydantic_fields_set__" not in state:
+            state["__pydantic_fields_set__"] = state.get("__fields_set__")
+
+        super().__setstate__(state)
 
 class LayerConfig(BaseModel, BaseConfig):
     channel_mult: int = Field(description="Multiplier for the number of channels ...")
