@@ -77,9 +77,8 @@ def train(rank, world_size):
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     # CosineAnnealingLR will decay the LR smoothly over max_epochs
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max_epochs)
-    
-    
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=each_epochs)
+
     for epoch in range(each_epochs):
         start_time = time.time()
         sampler.set_epoch(epoch)
