@@ -31,7 +31,7 @@ class ResNetConfig(BaseModel):
 
 class DDPMConfig(BaseModel):
     # Typically we use a list of betas, but you can also store them after creation.
-    betas: Optional[list[float]] = Field(default=None, description="Diffusion beta schedule")
+    betas: Optional[List[float]] = Field(default=None, description="Diffusion beta schedule")
     num_timesteps: int = 1000  # e.g. default T=1000
     loss_type: str = "l2"
 
