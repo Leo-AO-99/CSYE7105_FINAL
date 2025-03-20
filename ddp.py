@@ -79,12 +79,17 @@ def train(rank, world_size, args):
     
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
-    # CosineAnnealingLR will decay the LR smoothly over max_epochs
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs)
+    if args.s:
+        # CosineAnnealingLR will decay the LR smoothly over max_epochs
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs)
+    else:
+        scheduler = None
 
     for epoch in range(args.max_epochs):
-        start_time = time.time()
         sampler.set_epoch(epoch)
+        if rank == 0:
+            batch_progress = tqdm(dataloader, desc=f"Epoch {epoch}", leave=True)
+
         for images, labels in dataloader:
             images = images.to(rank)
             labels = labels.to(rank)
@@ -95,18 +100,26 @@ def train(rank, world_size, args):
             loss.backward()
             optimizer.step()
             update_ema(model, model_ema)
-        scheduler.step()
+            if rank == 0:
+                batch_progress.set_postfix(loss=loss.item())
+                sys.stdout.flush()
+
+        if scheduler is not None:
+            scheduler.step()
+            current_lr = scheduler.get_last_lr()[0]
+        else:
+            current_lr = args.lr
 
         model_ema.eval()
-        end_time = time.time()
-        print(f"Rank {rank} Epoch {epoch} took {end_time - start_time:.3f} seconds, ls: {loss.item()}")
 
-        if rank == 0 and (epoch + 1) % args.interval == 0:
-            save_dict = {
-                "model": model.module.state_dict(),
-                "config": cifar10_config,
-            }
-            torch.save(save_dict, f"{cpt_prefix}_cpt/epoch_{epoch}.pth")
+        if rank == 0:
+            tqdm.write(f"Epoch {epoch}, loss={loss.item():.4f}, LR={current_lr}")
+            if (epoch + 1) % args.interval == 0:
+                save_dict = {
+                    "model": model.module.state_dict(),
+                    "config": cifar10_config,
+                }
+                torch.save(save_dict, f"{cpt_prefix}_cpt/epoch_{epoch}.pth")
 
     dist.destroy_process_group()
     
@@ -118,6 +131,7 @@ def parse_args():
     parser.add_argument('--load_cpt', type=str, default=None, help='load checkpoint path')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--interval', type=int, default=25, help='Interval of saving checkpoint')
+    parser.add_argument('-s', action='store_true', help='lr scheduler')
     return parser.parse_args()
 
 if __name__ == "__main__":
