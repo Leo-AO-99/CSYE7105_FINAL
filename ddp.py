@@ -88,9 +88,11 @@ def train(rank, world_size, args):
     for epoch in range(args.max_epochs):
         sampler.set_epoch(epoch)
         if rank == 0:
-            batch_progress = tqdm(dataloader, desc=f"Epoch {epoch}", leave=True)
+            data_iter = tqdm(dataloader, desc=f"Epoch {epoch}", leave=True)
+        else:
+            data_iter = dataloader
 
-        for images, labels in dataloader:
+        for images, labels in data_iter:
             images = images.to(rank)
             labels = labels.to(rank)
 
@@ -101,7 +103,7 @@ def train(rank, world_size, args):
             optimizer.step()
             update_ema(model, model_ema)
             if rank == 0:
-                batch_progress.set_postfix(loss=loss.item())
+                data_iter.set_postfix(loss=loss.item())
                 sys.stdout.flush()
 
         if scheduler is not None:
