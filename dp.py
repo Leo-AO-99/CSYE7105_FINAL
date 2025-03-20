@@ -66,15 +66,16 @@ def dp_train(args):
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs)
     else:
         scheduler = None
-    data_iter = tqdm(train_loader, desc=f"Epoch {epoch}", leave=True)
     
     for epoch in range(args.max_epochs):
+        data_iter = tqdm(train_loader, desc=f"Epoch {epoch}", leave=True)
         
         for images, labels in data_iter:
             images = images.to(device)
             labels = labels.to(device)
 
             loss = model(images, labels)
+            loss = loss.mean()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
