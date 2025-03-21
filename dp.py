@@ -42,6 +42,7 @@ def dp_train(args):
         os.makedirs(f"{cpt_prefix}_cpt")
     
     start_epoch = 0
+    optimizer = None
 
     train_loader, test_loader = get_cifar10_dataloaders(batch_size=args.batch_size)
     if args.load_cpt is not None:
@@ -68,18 +69,16 @@ def dp_train(args):
                 
             if 'scheduler' in checkpoint:
                 scheduler_state = checkpoint['scheduler']
-            
-            if 'epoch' in checkpoint:
-                start_epoch = checkpoint['epoch'] + 1  # 从下一个epoch开始
-                print(f"Continuing training from epoch {start_epoch}")
+
     else:
         model = nn.DataParallel(DiffusionModel(cifar10_config)).to(device)
         model_ema = nn.DataParallel(DiffusionModel(cifar10_config)).to(device)
         model_ema.load_state_dict(model.state_dict())
         model_ema.eval()
+        optimizer = optim.Adam(model.parameters(), lr=args.lr)
         cur_config = cifar10_config
 
-    if args.load_cpt is None or not args.only_model or 'optimizer' not in checkpoint:
+    if optimizer is None:
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
     
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs)
@@ -87,14 +86,7 @@ def dp_train(args):
     if args.load_cpt is not None and not args.only_model and 'scheduler' in checkpoint:
         scheduler.load_state_dict(checkpoint['scheduler'])
         print("Loaded scheduler state from checkpoint")
-    
-    
-    
-    if args.s:
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs)
-    else:
-        scheduler = None
-    
+
     for epoch in range(start_epoch, args.max_epochs):
         data_iter = tqdm(train_loader, desc=f"Epoch {epoch}", leave=True)
         
