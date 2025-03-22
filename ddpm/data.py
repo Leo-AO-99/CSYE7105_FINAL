@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-
+from datasets import load_dataset
 def get_cifar10_dataloaders(batch_size=128, num_workers=4, data_augmentation=True, download=True):
     """
     Create DataLoader for CIFAR10 dataset
@@ -119,3 +119,42 @@ CIFAR10_CLASSES = [
     'airplane', 'automobile', 'bird', 'cat', 'deer',
     'dog', 'frog', 'horse', 'ship', 'truck'
 ]
+
+
+def get_lsun_church_dataloader(batch_size, num_workers=4):
+    """
+    Create a DataLoader for the LSUN Church dataset.
+    
+    Args:
+        batch_size: Size of each batch
+        num_workers: Number of worker threads for data loading
+        
+    Returns:
+        dataloader: DataLoader for LSUN Church dataset
+    """
+    # Define transformations for LSUN Church dataset
+    transform = transforms.Compose([
+        transforms.Resize(256),  # Resize to a standard size
+        transforms.CenterCrop(256),  # Center crop to make square images
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalize to [-1, 1]
+    ])
+    
+    # Create dataset from the downloaded zip file
+    dataset = datasets.ImageFolder(
+        root='./data/lsun_church',  # Assuming the extracted zip content is in this folder
+        transform=transform
+    )
+    
+    # Create and return the dataloader
+    dataloader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True,
+        drop_last=True
+    )
+    
+    return dataloader
+    
