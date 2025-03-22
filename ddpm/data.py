@@ -121,7 +121,7 @@ CIFAR10_CLASSES = [
 ]
 
 
-def get_lsun_church_dataloader(batch_size, num_workers=4):
+def get_lsun_church_dataloader(batch_size):
     """
     Create a DataLoader for the LSUN Church dataset.
     
@@ -141,17 +141,16 @@ def get_lsun_church_dataloader(batch_size, num_workers=4):
     ])
     
     # Create dataset from the downloaded zip file
-    dataset = datasets.ImageFolder(
-        root='./data/lsun_church',  # Assuming the extracted zip content is in this folder
-        transform=transform
-    )
+    dataset = load_dataset(
+        "imagefolder",
+        data_files="./data/lsun_church/images.zip",
+    )["train"]
     
     # Create and return the dataloader
     dataloader = DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=num_workers,
         pin_memory=True,
         drop_last=True
     )
