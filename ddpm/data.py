@@ -181,3 +181,12 @@ def get_lsun_church_dataloader(batch_size):
     
     return dataloader
     
+def get_lsun_church_datasets():
+    transform = transforms.Compose([
+        transforms.Resize(256),  # Resize to a standard size
+        transforms.CenterCrop(256),  # Center crop to make square images
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalize to [-1, 1]
+    ])
+    dataset = ZipImageDataset("./data/lsun_church/images.zip", transform)
+    return dataset
