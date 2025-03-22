@@ -2,6 +2,33 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from datasets import load_dataset
+
+import zipfile
+from PIL import Image
+import io
+from torch.utils.data import Dataset
+from torchvision import transforms
+
+class ZipImageDataset(Dataset):
+    def __init__(self, zip_path, transform=None):
+        self.zip_path = zip_path
+        self.transform = transform
+        self.zip_file = zipfile.ZipFile(self.zip_path, 'r')
+        
+        # 找出所有图像文件（支持 jpg/jpeg/png）
+        self.image_list = [f for f in self.zip_file.namelist() if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+
+    def __len__(self):
+        return len(self.image_list)
+
+    def __getitem__(self, idx):
+        image_name = self.image_list[idx]
+        with self.zip_file.open(image_name) as file:
+            image = Image.open(io.BytesIO(file.read())).convert('RGB')
+        if self.transform:
+            image = self.transform(image)
+        return image
+
 def get_cifar10_dataloaders(batch_size=128, num_workers=4, data_augmentation=True, download=True):
     """
     Create DataLoader for CIFAR10 dataset
@@ -141,11 +168,8 @@ def get_lsun_church_dataloader(batch_size):
     ])
     
     # Create dataset from the downloaded zip file
-    dataset = load_dataset(
-        "imagefolder",
-        data_files="./data/lsun_church/images.zip",
-    )["train"]
-    
+    dataset = ZipImageDataset("./data/lsun_church/images.zip", transform)
+
     # Create and return the dataloader
     dataloader = DataLoader(
         dataset,

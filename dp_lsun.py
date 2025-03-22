@@ -87,7 +87,7 @@ def dp_train(args):
     for epoch in range(start_epoch, args.max_epochs):
         data_iter = tqdm(train_loader, desc=f"Epoch {epoch}", leave=True)
         
-        for images, _ in data_iter:
+        for images in data_iter:
             images = images.to(device)
 
             loss = model(images, None)
