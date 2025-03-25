@@ -42,7 +42,7 @@ def dp_train(args):
     start_epoch = 0
     optimizer = None
     scaler = amp.GradScaler(device=device)
-    accumulation_steps = 64 // args.batch_size
+    accumulation_steps = args.step
     
 
     train_loader = get_lsun_church_dataloader(batch_size=args.batch_size)
@@ -143,6 +143,7 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--interval', type=int, default=25, help='Interval of saving checkpoint')
     parser.add_argument('--only_model', action='store_true', help='Only load model weights, not training state')
+    parser.add_argument('--step', type=int, default=4, help='Gradient accumulation steps')
     
     ret = parser.parse_args()
 
