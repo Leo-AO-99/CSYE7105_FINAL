@@ -5,6 +5,7 @@ import torch.distributed as dist
 import torch.nn as nn
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader, DistributedSampler
+import torch.amp as amp
 from tqdm import tqdm
 import sys
 import time
@@ -40,6 +41,9 @@ def dp_train(args):
     
     start_epoch = 0
     optimizer = None
+    scaler = amp.GradScaler(device=device)
+    accumulation_steps = 64 // args.batch_size
+    
 
     train_loader = get_lsun_church_dataloader(batch_size=args.batch_size)
     if args.load_cpt is not None:
@@ -87,14 +91,20 @@ def dp_train(args):
     for epoch in range(start_epoch, args.max_epochs):
         data_iter = tqdm(train_loader, desc=f"Epoch {epoch}", leave=True)
         
-        for images in data_iter:
+        for image_idx, images in enumerate(data_iter):
             images = images.to(device)
 
-            loss = model(images, None)
-            loss = loss.mean()
+            with amp.autocast():
+                loss = model(images, None)
+                loss = loss.mean() / accumulation_steps
+
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            scaler.scale(loss).backward()
+            if (image_idx + 1) % accumulation_steps == 0:
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
+    
             update_ema(model, model_ema)
             data_iter.set_postfix(loss=loss.item())
             sys.stdout.flush()
