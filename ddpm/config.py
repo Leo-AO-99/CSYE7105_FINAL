@@ -46,4 +46,8 @@ class DDPMConfig:
     res_net_config: ResNetConfig = ResNetConfig()
 
 cifar10_config = DDPMConfig()
-lsun_cat_config = DDPMConfig()
+
+
+lsun_church_config = DDPMConfig()
+lsun_church_config.num_classes = None
+lsun_church_config.res_net_config.layers_config.append(LayerConfig(channel_mult=16, use_attention=True))
