@@ -132,7 +132,7 @@ def dp_train(args):
 def parse_args():
     parser = argparse.ArgumentParser(description='Train DDPM with DDP')
     parser.add_argument('--max_epochs', type=int, default=1000, help='Maximum number of epochs')
-    parser.add_argument('--batch_size', type=int, default=None, help='Batch size per GPU')
+    parser.add_argument('--batch_size', type=int, default=64, help='Batch size per GPU')
     parser.add_argument('--load_cpt', type=str, default=None, help='load checkpoint path')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--interval', type=int, default=25, help='Interval of saving checkpoint')

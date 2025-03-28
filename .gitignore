@@ -4,3 +4,5 @@ data/
 __pycache__/
 diffusion_model.pth
 *.pth
+*.png
+cifar10_test_images/cifar-10-python.tar.gz
