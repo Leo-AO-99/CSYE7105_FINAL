@@ -170,7 +170,7 @@ class DiffusionModel(nn.Module):
         return x
 
     @torch.no_grad()
-    def sample_intermediate(self, shape, device, y=None):
+    def sample_intermediate(self, shape, device, y=None, save_every=1):
         """
         If you want to store the intermediate x_t as you go (for visualization).
         """
@@ -181,5 +181,6 @@ class DiffusionModel(nn.Module):
         for i in reversed(range(self.num_timesteps)):
             t = torch.full((b,), i, device=device, dtype=torch.long)
             x = self.p_sample(x, t, y=y)
-            xs.append(x.detach().cpu())
+            if (i + 1) % save_every == 0:
+                xs.append(x.detach().cpu())
         return xs
