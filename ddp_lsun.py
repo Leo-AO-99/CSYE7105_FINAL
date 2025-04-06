@@ -34,7 +34,7 @@ def update_ema(model, ema_model, alpha=0.9999):
         for p, p_ema in zip(model.parameters(), ema_model.parameters()):
             p_ema.data = alpha * p_ema.data + (1 - alpha) * p.data
             
-def train(rank, args):
+def train(rank, world_size, args):
     if rank == 0:
         cpt_prefix = f"lsun_church_{int(time.time())}"
         if not os.path.exists(f"{cpt_prefix}_cpt"):

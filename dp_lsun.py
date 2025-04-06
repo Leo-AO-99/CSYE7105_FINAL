@@ -94,7 +94,7 @@ def dp_train(args):
         for image_idx, images in enumerate(data_iter):
             images = images.to(device)
 
-            with amp.autocast():
+            with amp.autocast(device_type=device.type):
                 loss = model(images, None)
                 loss = loss.mean() / accumulation_steps
 
