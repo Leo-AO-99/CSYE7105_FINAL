@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 from ddpm.config import DDPMConfig
 from ddpm.res_net import ResNet
-from typing import Optional
+from typing import Optional, List
 
 def extract(a, t, x_shape):
     """
@@ -170,7 +170,7 @@ class DiffusionModel(nn.Module):
         return x
 
     @torch.no_grad()
-    def sample_intermediate(self, shape, device, y=None, save_steps: list[int] = []):
+    def sample_intermediate(self, shape, device, y=None, save_steps: List[int] = []):
         """
         If you want to store the intermediate x_t as you go (for visualization).
         """
