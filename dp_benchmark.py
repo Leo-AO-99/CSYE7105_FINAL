@@ -26,7 +26,13 @@ def dp_train(args):
     model_ema.eval()
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
-    for epoch in range(start_epoch, 8):
+    start_time = torch.cuda.Event(enable_timing=True)
+    end_time = torch.cuda.Event(enable_timing=True)
+    start_time.record()
+
+    for epoch in range(start_epoch, 10):
+        model.train()
+        model_ema.eval()
         data_iter = tqdm(train_loader, desc=f"Epoch {epoch}", leave=True)
         
         for images, labels in data_iter:
@@ -40,7 +46,9 @@ def dp_train(args):
             optimizer.step()
             update_ema(model, model_ema)
 
-        model_ema.eval()
+
+    end_time.record()
+    print(f"time: {start_time.elapsed_time(end_time) / 1000:.3f} seconds")
 
 def parse_args():
     parser = argparse.ArgumentParser(description='DP benchmark')

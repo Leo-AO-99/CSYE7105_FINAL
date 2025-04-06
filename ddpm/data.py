@@ -1,7 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-from datasets import load_dataset
 
 import zipfile
 from PIL import Image

@@ -121,12 +121,12 @@ class SelfAttention(nn.Module):
         b, c, h, w = x.shape
         q, k, v = torch.split(self.to_qkv(self.group_norm(x)), self.in_channels, dim=1)
 
-        q = q.permute(0, 2, 3, 1).view(b, h * w, c)
-        k = k.view(b, c, h * w)
-        v = v.permute(0, 2, 3, 1).view(b, h * w, c)
-        # q = q.permute(0, 2, 3, 1).contiguous().view(b, h * w, c)
-        # k = k.contiguous().view(b, c, h * w)
-        # v = v.permute(0, 2, 3, 1).contiguous().view(b, h * w, c)
+        # q = q.permute(0, 2, 3, 1).view(b, h * w, c)
+        # k = k.view(b, c, h * w)
+        # v = v.permute(0, 2, 3, 1).view(b, h * w, c)
+        q = q.permute(0, 2, 3, 1).contiguous().view(b, h * w, c)
+        k = k.contiguous().view(b, c, h * w)
+        v = v.permute(0, 2, 3, 1).contiguous().view(b, h * w, c)
         
         debug(f"SelfAttention, q.shape: {q.shape}, k.shape: {k.shape}, v.shape: {v.shape}")
 
@@ -136,8 +136,8 @@ class SelfAttention(nn.Module):
         attention = torch.softmax(dot_products, dim=-1)
         out = torch.bmm(attention, v)
         assert out.shape == (b, h * w, c)
-        out = out.view(b, h, w, c).permute(0, 3, 1, 2)
-        # out = out.view(b, h, w, c).permute(0, 3, 1, 2).contiguous()        
+        # out = out.view(b, h, w, c).permute(0, 3, 1, 2)
+        out = out.view(b, h, w, c).permute(0, 3, 1, 2).contiguous()        
         out = self.to_out(out) + x
         debug(f"SelfAttention, out.shape: {out.shape}")
 

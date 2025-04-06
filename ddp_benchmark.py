@@ -25,7 +25,7 @@ device_count = torch.cuda.device_count()
 def train(rank, world_size, args):
 
     addr = "localhost"
-    port = 47239
+    port = args.port
     dist.init_process_group(backend='nccl', world_size=world_size, rank=rank, init_method=f"tcp://{addr}:{port}")
     torch.cuda.set_device(rank)
 
@@ -37,16 +37,22 @@ def train(rank, world_size, args):
     model_ema.eval()    
 
     model = nn.parallel.DistributedDataParallel(model, device_ids=[rank])
-    model_ema = nn.parallel.DistributedDataParallel(model_ema, device_ids=[rank])
-
 
     sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
     dataloader = DataLoader(train_dataset, batch_size=args.batch_size, sampler=sampler, num_workers=4, pin_memory=True)
     
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    
+    if rank == 0:
+        start_time = torch.cuda.Event(enable_timing=True)
+        end_time = torch.cuda.Event(enable_timing=True)
+        start_time.record()
 
-    for epoch in range(args.max_epochs):
+    for epoch in range(10):
+        model.train()
+        model_ema.eval()
         sampler.set_epoch(epoch)
+        ddp_loss = torch.zeros(2).to(rank)
         if rank == 0:
             data_iter = tqdm(dataloader, desc=f"Epoch {epoch}", leave=True)
         else:
@@ -61,9 +67,16 @@ def train(rank, world_size, args):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            update_ema(model, model_ema)
+            update_ema(model.module, model_ema)
+            ddp_loss[0] += loss.item()
+            ddp_loss[1] += args.batch_size
+        dist.all_reduce(ddp_loss, op=dist.ReduceOp.SUM, async_op=True)
+        if rank == 0:
+            data_iter.set_description(f"Epoch {epoch} loss: {ddp_loss[0] / ddp_loss[1]:.4f}")
 
-        model_ema.eval()
+    if rank == 0:
+        end_time.record()
+        print(f"time: {start_time.elapsed_time(end_time) / 1000:.3f} seconds")
 
     dist.destroy_process_group()
     
@@ -71,14 +84,11 @@ def train(rank, world_size, args):
 def parse_args():
     parser = argparse.ArgumentParser(description='DDP benchmark')
     parser.add_argument('--batch_size', type=int, default=None, help='Batch size per GPU')
+    parser.add_argument('--port', type=int, default=47239, help='Port number')
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
     
-    ss_time = time.time()
-    
     world_size = device_count
     mp.spawn(train, args=(world_size, args,), nprocs=world_size)
-    
-    print(f"Total time: {time.time() - ss_time:.3f} seconds")
