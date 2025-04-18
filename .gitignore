@@ -4,3 +4,7 @@ data/
 __pycache__/
 diffusion_model.pth
 *.pth
+/cifar10_gen_samples
+/cifar10_samples_labeled
+/cifar10_test_images
+*.png
