@@ -4,7 +4,6 @@ torchaudio
 tqdm
 numpy
 matplotlib
-pydantic<2.0
 Pillow
 torch_fidelity
 torchmetrics

@@ -5,12 +5,6 @@ import torch.nn.functional as F
 
 from ddpm.config import DDPMConfig, DEBUG, debug
 
-# 全套注释
-
-# 是否是分类图片
-
-# time embeded
-
 class PositionalEmbedding(nn.Module):
     '''
     positional embedding of timesteps

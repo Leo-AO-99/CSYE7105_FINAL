@@ -20,8 +20,6 @@ cifar10_inference.ipynb is for inference, need to download the checkpoint file f
 
 link is in report(conclusion section)
 
-
-
 change the `cpt_path` to the path of the checkpoint file.
 
 ## For benchmark
@@ -63,4 +61,4 @@ def parse_args():
 
 dp.py
 
-ddp.py (there is bug in this file, since we have finished training, we have not fixed it, we will fix it later)
+ddp.py (there is bug in this file, since we have finished training, we have not fixed it, we will fix it in resubmission)

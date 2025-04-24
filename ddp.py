@@ -49,15 +49,35 @@ def train(rank, world_size, args):
 
     train_dataset, test_dataset = get_cifar10_datasets()
     
+    # 默认从第0个epoch开始
+    start_epoch = 0
+    optimizer = None
+    
     if args.load_cpt is not None:
         checkpoint = torch.load(args.load_cpt, map_location=f'cuda:{rank}', weights_only=False)
         model = DiffusionModel(checkpoint['config']).to(rank)
         model.load_state_dict(checkpoint['model'])
         
         model_ema = DiffusionModel(checkpoint['config']).to(rank)
-        model_ema.load_state_dict(checkpoint['model'])  # 用相同的权重初始化EMA模型
+        model_ema.load_state_dict(checkpoint['model_ema'] if 'model_ema' in checkpoint else checkpoint['model'])
         model_ema.eval()
         cur_config = checkpoint['config']
+        
+        # 如果不是仅加载模型权重，尝试加载训练状态
+        if not args.only_model:
+            if 'optimizer' in checkpoint:
+                optimizer = optim.Adam(model.parameters(), lr=args.lr)
+                optimizer.load_state_dict(checkpoint['optimizer'])
+                if rank == 0:
+                    print("Loaded optimizer state from checkpoint")
+            
+            if 'epoch' in checkpoint:
+                start_epoch = checkpoint['epoch'] + 1  # 从下一个epoch开始
+                if rank == 0:
+                    print(f"Continuing training from epoch {start_epoch}")
+                
+            if 'scheduler' in checkpoint and args.s:
+                scheduler_state = checkpoint['scheduler']
     else:
         model = DiffusionModel(cifar10_config).to(rank)
         model_ema = DiffusionModel(cifar10_config).to(rank)
@@ -65,27 +85,32 @@ def train(rank, world_size, args):
         model_ema.eval()
         cur_config = cifar10_config
 
-    
-
     model = nn.parallel.DistributedDataParallel(model, device_ids=[rank])
     model_ema = nn.parallel.DistributedDataParallel(model_ema, device_ids=[rank])
 
-
     sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
     dataloader = DataLoader(train_dataset, batch_size=args.batch_size, sampler=sampler, num_workers=4, pin_memory=True)
+    
     if rank == 0:
         print(f"dataset length: {len(train_dataset)}")
     print(f"Rank {rank} dataloader length: {len(dataloader)}")
     
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    # 如果optimizer尚未初始化，创建一个新的
+    if optimizer is None:
+        optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
+    # 创建调度器
     if args.s:
-        # CosineAnnealingLR will decay the LR smoothly over max_epochs
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.max_epochs)
+        # 如果有保存的scheduler状态，加载它
+        if args.load_cpt is not None and not args.only_model and 'scheduler' in checkpoint:
+            scheduler.load_state_dict(checkpoint['scheduler'])
+            if rank == 0:
+                print("Loaded scheduler state from checkpoint")
     else:
         scheduler = None
 
-    for epoch in range(args.max_epochs):
+    for epoch in range(start_epoch, args.max_epochs):
         sampler.set_epoch(epoch)
         if rank == 0:
             data_iter = tqdm(dataloader, desc=f"Epoch {epoch}", leave=True)
@@ -119,9 +144,31 @@ def train(rank, world_size, args):
             if (epoch + 1) % args.interval == 0:
                 save_dict = {
                     "model": model.module.state_dict(),
-                    "config": cifar10_config,
+                    "model_ema": model_ema.module.state_dict(),
+                    "config": cur_config,
+                    "optimizer": optimizer.state_dict(),
+                    "epoch": epoch,
                 }
+                
+                if scheduler is not None:
+                    save_dict["scheduler"] = scheduler.state_dict()
+                    
                 torch.save(save_dict, f"{cpt_prefix}_cpt/epoch_{epoch}.pth")
+    
+    # 训练结束后保存最终模型
+    if rank == 0:
+        save_dict = {
+            "model": model.module.state_dict(),
+            "model_ema": model_ema.module.state_dict(),
+            "config": cur_config,
+            "optimizer": optimizer.state_dict(),
+            "epoch": args.max_epochs - 1,
+        }
+        
+        if scheduler is not None:
+            save_dict["scheduler"] = scheduler.state_dict()
+            
+        torch.save(save_dict, f"{cpt_prefix}_cpt/final.pth")
 
     dist.destroy_process_group()
     
@@ -134,6 +181,7 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--interval', type=int, default=25, help='Interval of saving checkpoint')
     parser.add_argument('-s', action='store_true', help='lr scheduler')
+    parser.add_argument('--only_model', action='store_true', help='Only load model weights, not training state')
     return parser.parse_args()
 
 if __name__ == "__main__":
